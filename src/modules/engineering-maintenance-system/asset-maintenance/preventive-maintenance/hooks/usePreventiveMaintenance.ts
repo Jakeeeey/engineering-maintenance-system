@@ -45,6 +45,23 @@ export function useCreateSchedule(onSuccess?: () => void) {
   return { mutateAsync, isPending };
 }
 
+export function useUpdateSchedule(onSuccess?: () => void) {
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async ({ id, payload }: { id: number; payload: Partial<MaintenanceSchedule> }) => {
+    setIsPending(true);
+    try {
+      const res = await PreventiveMaintenanceApi.updateSchedule(id, payload);
+      onSuccess?.();
+      return res;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}
+
 export function useLogUsage(onSuccess?: () => void) {
   const [isPending, setIsPending] = useState(false);
 

@@ -32,6 +32,9 @@ export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompletin
           <TableRow>
             <TableHead>ID</TableHead>
             <TableHead>Asset ID</TableHead>
+            <TableHead>Item Name</TableHead>
+            <TableHead>Classification</TableHead>
+            <TableHead>Location</TableHead>
             <TableHead>Schedule ID</TableHead>
             <TableHead>Description</TableHead>
             <TableHead>Generated At</TableHead>
@@ -48,6 +51,9 @@ export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompletin
               <TableRow key={wo.id}>
                 <TableCell>{wo.id}</TableCell>
                 <TableCell>{wo.assetId}</TableCell>
+                <TableCell>{wo.itemName ?? "N/A"}</TableCell>
+                <TableCell>{wo.classification ?? "N/A"}</TableCell>
+                <TableCell>{wo.location ?? "Unassigned"}</TableCell>
                 <TableCell>{wo.scheduleId || "N/A"}</TableCell>
                 <TableCell>{wo.description || "N/A"}</TableCell>
                 <TableCell>{new Date(wo.generatedAt).toLocaleString()}</TableCell>

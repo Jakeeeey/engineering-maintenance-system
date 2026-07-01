@@ -122,13 +122,12 @@ export function ViewEquipmentDetailsModal({
             </div>
 
             <div className="space-y-6 grow">
-              {/* Financial Data Grid */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Location Data */}
+              <div className="grid grid-cols-1 gap-4">
                 <DataCard
-                  label="Cost per item"
-                  value={new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(asset.costPerItem || 0)}
+                  label="Location"
+                  value={asset.asset_location?.[0]?.location || 'Unassigned'}
                 />
-                <DataCard label="Life Span" value={`${asset.lifeSpan || 0} Months`} />
               </div>
 
               <Separator className="opacity-50" />

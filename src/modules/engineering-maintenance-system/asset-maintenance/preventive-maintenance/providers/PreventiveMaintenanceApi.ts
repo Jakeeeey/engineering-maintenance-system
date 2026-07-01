@@ -27,6 +27,21 @@ export class PreventiveMaintenanceApi {
     return json.data;
   }
 
+  static async updateSchedule(id: number, payload: Partial<MaintenanceSchedule>): Promise<MaintenanceSchedule> {
+    const res = await fetch(`${BASE_URL}/schedules`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ id, ...payload }),
+    });
+    if (!res.ok) {
+      throw new Error("Failed to update schedule");
+    }
+    const json = await res.json();
+    return json.data;
+  }
+
   static async logUsage(assetId: string, meterValue: number, unit: string): Promise<void> {
     const res = await fetch(`${BASE_URL}/usage-logs`, {
       method: "POST",

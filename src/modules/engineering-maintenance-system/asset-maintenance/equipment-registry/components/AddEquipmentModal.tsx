@@ -47,6 +47,7 @@ const formSchema = z.object({
   dateAcquired: z.string().min(1, "Acquisition date is required"),
   employee: z.string().min(1, "Initial owner name is required"),
   condition: z.string().min(1, "Condition is required"),
+  location: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -78,6 +79,7 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
       dateAcquired: "",
       employee: "",
       condition: "Good",
+      location: "",
     },
   });
 
@@ -367,7 +369,7 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="dateAcquired"
@@ -400,6 +402,19 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                         <SelectItem value="Discontinued">Discontinued</SelectItem>
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter location" {...field} value={field.value ?? ""} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

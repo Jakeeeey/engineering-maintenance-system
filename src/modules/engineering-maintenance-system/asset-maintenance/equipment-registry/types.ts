@@ -22,6 +22,8 @@ export interface Asset {
   latestRemarkBy?: string;
   createdAt: string;
   updatedAt: string;
+  location?: string;
+  asset_location?: { location: string }[];
 }
 
 export interface AssetOwner {

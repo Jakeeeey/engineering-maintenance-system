@@ -35,6 +35,7 @@ function mapToCamelCase(item: Record<string, unknown>): Asset {
     latestRemark,
     latestRemarkBy,
     documents: item.documents as { id: string; name: string; url: string }[] | undefined,
+    asset_location: item.asset_location as { location: string }[] | undefined,
     createdAt: item.date_created as string,
     updatedAt: item.date_updated as string,
   };
@@ -80,6 +81,30 @@ export async function GET(request: NextRequest) {
     if (rawAssets.length > 0) {
       const assetIds = rawAssets.map(a => a.id).filter(Boolean);
       if (assetIds.length > 0) {
+        try {
+          const locationRes = await directusFetch<DirectusList<Record<string, unknown>>>(
+            `/items/asset_location?filter[asset_id][_in]=${assetIds.join(",")}&filter[is_current_location][_eq]=1&fields=asset_id,location&limit=-1`
+          );
+          
+          const locationsMap = new Map<string, string>();
+          if (locationRes.data) {
+            for (const loc of locationRes.data) {
+               if (loc.asset_id && loc.location) {
+                 locationsMap.set(String(loc.asset_id), String(loc.location));
+               }
+            }
+          }
+          
+          for (const asset of rawAssets) {
+             const mappedLocation = locationsMap.get(String(asset.id));
+             if (mappedLocation) {
+               asset.asset_location = [{ location: mappedLocation }];
+             }
+          }
+        } catch (err) {
+          console.warn("Failed to fetch asset locations", err);
+        }
+
         try {
           const ownersRes = await directusFetch<DirectusList<Record<string, unknown>>>(
             `/items/asset_owners?filter[asset_id][_in]=${assetIds.join(",")}&filter[is_current_owner][_eq]=true`
@@ -283,6 +308,18 @@ export async function POST(request: NextRequest) {
           asset_id: response.data.id,
           owner_name: body.employee,
           is_current_owner: 1,
+        }),
+      });
+    }
+
+    if (typeof body.location === 'string' && body.location.trim() !== '') {
+      await directusFetch("/items/asset_location", {
+        method: "POST",
+        body: JSON.stringify({
+          asset_id: response.data.id,
+          location: body.location.trim(),
+          assigned_by: 133, // Default user id for now, matches employee upload
+          is_current_location: 1
         }),
       });
     }

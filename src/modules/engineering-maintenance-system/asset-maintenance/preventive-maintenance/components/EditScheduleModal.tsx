@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,49 +21,68 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useCreateSchedule } from "../hooks/usePreventiveMaintenance";
-import { AssetCombobox } from "./AssetCombobox";
+import { Switch } from "@/components/ui/switch";
+import { useUpdateSchedule } from "../hooks/usePreventiveMaintenance";
+import { MaintenanceSchedule } from "../types";
+
+const numberStringOptional = z.string().optional().refine(
+  (val) => !val || !isNaN(Number(val)),
+  { message: "Must be a valid number" }
+);
 
 const formSchema = z.object({
-  assetId: z.string().min(1, "Asset ID is required"),
-  timeIntervalValue: z.string().optional(),
+  timeIntervalValue: numberStringOptional,
   timeIntervalUnit: z.string().optional(),
   nextDueDate: z.string().optional(),
-  usageIntervalValue: z.string().optional(),
+  usageIntervalValue: numberStringOptional,
   usageIntervalUnit: z.string().optional(),
-  nextDueUsage: z.string().optional(),
+  nextDueUsage: numberStringOptional,
+  isActive: z.boolean(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface AddScheduleModalProps {
+interface EditScheduleModalProps {
   isOpen: boolean;
+  schedule: MaintenanceSchedule;
   onClose: () => void;
   onSuccess?: () => void;
 }
 
-export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModalProps) {
-  const { mutateAsync: createSchedule, isPending } = useCreateSchedule(onSuccess);
+export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: EditScheduleModalProps) {
+  const { mutateAsync: updateSchedule, isPending } = useUpdateSchedule(onSuccess);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      assetId: "",
-      timeIntervalValue: "",
-      timeIntervalUnit: "",
-      nextDueDate: "",
-      usageIntervalValue: "",
-      usageIntervalUnit: "",
-      nextDueUsage: "",
+      timeIntervalValue: schedule.timeIntervalValue?.toString() || "",
+      timeIntervalUnit: schedule.timeIntervalUnit || "",
+      nextDueDate: schedule.nextDueDate ? schedule.nextDueDate.split("T")[0] : "",
+      usageIntervalValue: schedule.usageIntervalValue?.toString() || "",
+      usageIntervalUnit: schedule.usageIntervalUnit || "",
+      nextDueUsage: schedule.nextDueUsage?.toString() || "",
+      isActive: schedule.isActive,
     },
   });
 
+  useEffect(() => {
+    if (isOpen && schedule) {
+      form.reset({
+        timeIntervalValue: schedule.timeIntervalValue?.toString() || "",
+        timeIntervalUnit: schedule.timeIntervalUnit || "",
+        nextDueDate: schedule.nextDueDate ? schedule.nextDueDate.split("T")[0] : "",
+        usageIntervalValue: schedule.usageIntervalValue?.toString() || "",
+        usageIntervalUnit: schedule.usageIntervalUnit || "",
+        nextDueUsage: schedule.nextDueUsage?.toString() || "",
+        isActive: schedule.isActive,
+      });
+    }
+  }, [isOpen, schedule, form]);
+
   const onSubmit = async (values: FormValues) => {
     try {
-      // Allow concurrent time and usage intervals, but user must provide at least one
       const payload: Record<string, unknown> = {
-        assetId: Number(values.assetId),
-        isActive: true,
+        isActive: values.isActive,
       };
 
       if (values.timeIntervalValue) {
@@ -71,6 +91,10 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
         if (values.nextDueDate) {
           payload.nextDueDate = values.nextDueDate;
         }
+      } else {
+        payload.timeIntervalValue = null;
+        payload.timeIntervalUnit = null;
+        payload.nextDueDate = null;
       }
 
       if (values.usageIntervalValue) {
@@ -79,13 +103,17 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
         if (values.nextDueUsage) {
           payload.nextDueUsage = Number(values.nextDueUsage);
         }
+      } else {
+        payload.usageIntervalValue = null;
+        payload.usageIntervalUnit = null;
+        payload.nextDueUsage = null;
       }
 
-      await createSchedule(payload);
+      await updateSchedule({ id: schedule.id, payload });
       form.reset();
       onClose();
     } catch (error) {
-      console.error("Failed to create schedule", error);
+      console.error("Failed to update schedule", error);
     }
   };
 
@@ -93,27 +121,35 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Add Maintenance Schedule</DialogTitle>
+          <DialogTitle>Edit Maintenance Schedule #{schedule.id}</DialogTitle>
           <DialogDescription className="sr-only">
-            Define time-based or usage-based maintenance triggers.
+            Edit time-based or usage-based maintenance triggers.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            
             <FormField
               control={form.control}
-              name="assetId"
+              name="isActive"
               render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Asset ID</FormLabel>
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Active Status</FormLabel>
+                    <DialogDescription>
+                      Is this schedule currently active?
+                    </DialogDescription>
+                  </div>
                   <FormControl>
-                    <AssetCombobox value={field.value} onChange={field.onChange} />
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
                   </FormControl>
-                  <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <div className="border rounded-md p-3 space-y-3">
               <h4 className="font-semibold text-sm">Time-Based Trigger</h4>
               <div className="grid grid-cols-2 gap-4">
@@ -196,7 +232,7 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
                   <FormItem>
                     <FormLabel>Next Due Usage</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="Target meter reading" {...field} />
+                      <Input type="number" step="0.01" placeholder="Target meter reading" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -209,7 +245,7 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "Saving..." : "Save Schedule"}
+                {isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>
           </form>

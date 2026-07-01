@@ -21,6 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useLogUsage } from "../hooks/usePreventiveMaintenance";
+import { AssetCombobox } from "./AssetCombobox";
 
 const formSchema = z.object({
   assetId: z.string().min(1, "Asset ID is required"),
@@ -80,7 +81,7 @@ export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps
                 <FormItem>
                   <FormLabel>Asset ID</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Asset ID" {...field} />
+                    <AssetCombobox value={field.value} onChange={field.onChange} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

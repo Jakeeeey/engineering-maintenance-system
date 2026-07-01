@@ -1,6 +1,9 @@
 export interface MaintenanceSchedule {
   id: number;
   assetId: number;
+  itemName?: string;
+  classification?: string;
+  location?: string;
   timeIntervalValue: number | null;
   timeIntervalUnit: string | null;
   usageIntervalValue: number | null;
@@ -16,6 +19,9 @@ export interface MaintenanceSchedule {
 export interface MaintenanceWorkOrder {
   id: number;
   assetId: number;
+  itemName?: string;
+  classification?: string;
+  location?: string;
   scheduleId: number | null;
   description: string | null;
   statusId: number | null;

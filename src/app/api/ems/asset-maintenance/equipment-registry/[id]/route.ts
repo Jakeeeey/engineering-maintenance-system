@@ -214,7 +214,50 @@ export async function PATCH(
       }
     }
 
-    // 5. Update the actual asset
+    // 5. Handle Location changes
+    if (body.location !== undefined) {
+      const activeLocRes = await directusFetch<{ data: { id: number, location: string }[] }>(
+        `/items/asset_location?filter[asset_id][_eq]=${id}&filter[is_current_location][_eq]=1`
+      );
+      const activeLoc = activeLocRes.data?.[0];
+      
+      const newLoc = typeof body.location === 'string' ? body.location.trim() : "";
+
+      if (!activeLoc) {
+        if (newLoc !== "") {
+          await directusFetch("/items/asset_location", {
+            method: "POST",
+            body: JSON.stringify({
+              asset_id: id,
+              location: newLoc,
+              assigned_by: currentUserId || 133,
+              is_current_location: 1
+            })
+          });
+        }
+      } else {
+        if (activeLoc.location !== newLoc) {
+          await directusFetch(`/items/asset_location/${activeLoc.id}`, {
+            method: "PATCH",
+            body: JSON.stringify({ is_current_location: 0 })
+          });
+
+          if (newLoc !== "") {
+            await directusFetch("/items/asset_location", {
+              method: "POST",
+              body: JSON.stringify({
+                asset_id: id,
+                location: newLoc,
+                assigned_by: currentUserId || 133,
+                is_current_location: 1
+              })
+            });
+          }
+        }
+      }
+    }
+
+    // 6. Update the actual asset
     const response = await directusFetch<{ data: Record<string, unknown> }>(`/items/assets_and_equipment/${id}?fields=*,item_id.id,item_id.item_name,item_id.item_classification.classification_name,item_id.item_type.type_name,asset_owners.*`, {
       method: "PATCH",
       body: JSON.stringify(payload),

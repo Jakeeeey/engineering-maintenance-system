@@ -39,6 +39,7 @@ const detailsSchema = z.object({
   rfidCode: z.string().optional(),
   costPerItem: z.string().min(1, "Cost must be a positive number"),
   lifeSpan: z.string().min(1, "Life span must be at least 1"),
+  location: z.string().optional(),
   isActive: z.boolean(),
 });
 
@@ -75,7 +76,7 @@ export function ManageEquipmentModal({ asset, isOpen, onClose, onSuccess }: Mana
   // Forms
   const detailsForm = useForm<DetailsValues>({
     resolver: zodResolver(detailsSchema),
-    defaultValues: { itemName: "", itemClassification: "", itemType: "", serial: "", barcode: "", rfidCode: "", costPerItem: "", lifeSpan: "", isActive: true },
+    defaultValues: { itemName: "", itemClassification: "", itemType: "", serial: "", barcode: "", rfidCode: "", costPerItem: "", lifeSpan: "", location: "", isActive: true },
   });
 
   const conditionForm = useForm<ConditionValues>({
@@ -101,6 +102,7 @@ export function ManageEquipmentModal({ asset, isOpen, onClose, onSuccess }: Mana
         rfidCode: asset.rfidCode || "",
         costPerItem: asset.costPerItem?.toString() || "",
         lifeSpan: asset.lifeSpan?.toString() || "",
+        location: asset.asset_location?.[0]?.location || "",
         isActive: asset.isActive ?? true,
       });
       conditionForm.reset({ condition: asset.condition || "Good", remarks: "" });
@@ -151,6 +153,7 @@ export function ManageEquipmentModal({ asset, isOpen, onClose, onSuccess }: Mana
           rfidCode: values.rfidCode,
           costPerItem: Number(values.costPerItem),
           lifeSpan: Number(values.lifeSpan),
+          location: values.location,
           isActive: values.isActive,
           itemImage: imageId,
           newDocuments: docIds.length > 0 ? docIds : undefined,
@@ -313,6 +316,17 @@ export function ManageEquipmentModal({ asset, isOpen, onClose, onSuccess }: Mana
                       <FormItem>
                         <FormLabel>Expected Life Span (Months)</FormLabel>
                         <FormControl><Input type="number" {...field} value={field.value ?? ""} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={detailsForm.control}
+                    name="location"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <FormControl><Input placeholder="Enter location" {...field} value={field.value ?? ""} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}

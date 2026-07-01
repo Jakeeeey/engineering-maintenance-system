@@ -102,7 +102,7 @@ export function EquipmentTable({
             <TableHead>Condition</TableHead>
             <TableHead>Current Owner</TableHead>
             <TableHead>Date Acquired</TableHead>
-            <TableHead>Cost / Lifespan</TableHead>
+            <TableHead>Location</TableHead>
             <TableHead>Active Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -139,8 +139,7 @@ export function EquipmentTable({
                 <TableCell>{asset.currentOwner || "Unassigned"}</TableCell>
                 <TableCell>{formatDate(asset.dateAcquired)}</TableCell>
                 <TableCell>
-                  <div>{new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(asset.costPerItem || 0)}</div>
-                  <div className="text-xs text-gray-500">{asset.lifeSpan} mo</div>
+                  <div>{asset.asset_location?.[0]?.location || 'Unassigned'}</div>
                 </TableCell>
                 <TableCell>
                   {asset.isActive ? (

@@ -34,7 +34,7 @@ export function SchedulesTable({ schedules, isLoading, onEdit, roleName }: Sched
         <TableHeader>
           <TableRow>
             <TableHead>ID</TableHead>
-            <TableHead>Asset ID</TableHead>
+            <TableHead>RFID</TableHead>
             <TableHead>Item Name</TableHead>
             <TableHead>Classification</TableHead>
             <TableHead>Location</TableHead>
@@ -50,7 +50,7 @@ export function SchedulesTable({ schedules, isLoading, onEdit, roleName }: Sched
           {schedules.map((schedule) => (
             <TableRow key={schedule.id}>
               <TableCell>{schedule.id}</TableCell>
-              <TableCell>{schedule.assetId}</TableCell>
+              <TableCell>{schedule.rfidCode || "N/A"}</TableCell>
               <TableCell>{schedule.itemName ?? "N/A"}</TableCell>
               <TableCell>{schedule.classification ?? "N/A"}</TableCell>
               <TableCell>{schedule.location ?? "Unassigned"}</TableCell>

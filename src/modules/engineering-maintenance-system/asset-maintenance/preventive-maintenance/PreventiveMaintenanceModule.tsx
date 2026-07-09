@@ -15,7 +15,7 @@ import { EditScheduleModal } from "./components/EditScheduleModal";
 import {
   useGetSchedules,
   useGetWorkOrders,
-  useCompleteWorkOrder,
+  useUpdateWorkOrderStatus,
 } from "./hooks/usePreventiveMaintenance";
 import { MaintenanceSchedule } from "./types";
 
@@ -44,13 +44,13 @@ export default function PreventiveMaintenanceModule({ roleName }: PreventiveMain
     refetch: refetchWorkOrders,
   } = useGetWorkOrders();
 
-  const { mutateAsync: completeWorkOrder, isPending: isCompleting } = useCompleteWorkOrder(() => {
+  const { mutateAsync: updateWorkOrderStatus, isPending: isUpdating } = useUpdateWorkOrderStatus(() => {
     refetchWorkOrders();
   });
 
-  const handleCompleteWorkOrder = async (id: string) => {
+  const handleUpdateWorkOrderStatus = async (id: string, statusId: number) => {
     try {
-      await completeWorkOrder({ id });
+      await updateWorkOrderStatus({ id, statusId });
     } catch (error) {
       console.error(error);
     }
@@ -132,8 +132,8 @@ export default function PreventiveMaintenanceModule({ roleName }: PreventiveMain
           <WorkOrdersTable 
             workOrders={filteredWorkOrders} 
             isLoading={isLoadingWorkOrders} 
-            onComplete={handleCompleteWorkOrder}
-            isCompleting={isCompleting}
+            onUpdateStatus={handleUpdateWorkOrderStatus}
+            isUpdating={isUpdating}
           />
         </TabsContent>
       </Tabs>

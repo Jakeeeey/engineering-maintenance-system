@@ -9,7 +9,7 @@ function mapToCamelCase(item: Record<string, unknown>): Asset {
   const itemIdObj = item.item_id as Record<string, unknown> | undefined;
 
   const currentOwnerName = item.current_owner_name as string | undefined;
-  const employeeName = currentOwnerName || (item.employee as string) || "Unassigned";
+  const employeeName = currentOwnerName || "Unassigned";
 
   const latestRemark = item.latest_remark as string | undefined;
   const latestRemarkBy = item.latest_remark_by as string | undefined;
@@ -64,12 +64,17 @@ export async function GET(request: NextRequest) {
     const employee = searchParams.get("employee");
 
     const queryParams = new URLSearchParams();
-    if (search) queryParams.set("search", search);
+    if (search) {
+      queryParams.set("filter[_or][0][serial][_icontains]", search);
+      queryParams.set("filter[_or][1][barcode][_icontains]", search);
+      queryParams.set("filter[_or][2][rfid_code][_icontains]", search);
+      queryParams.set("filter[_or][3][item_id][item_name][_icontains]", search);
+    }
     if (condition) queryParams.set("filter[condition][_eq]", condition);
     if (employee) queryParams.set("filter[employee][_eq]", employee);
 
     // Sort by recent by default
-    queryParams.set("sort", "-date_created");
+    queryParams.set("sort", "-id");
     queryParams.set("fields", "*,item_id.item_name,item_id.item_type.*,item_id.item_classification.*");
 
     const qs = queryParams.toString();
@@ -247,6 +252,31 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    const orFilters: string[] = [];
+    if (body.serial) {
+      orFilters.push(`filter[_or][${orFilters.length}][serial][_eq]=${encodeURIComponent(body.serial as string)}`);
+    }
+    if (body.barcode) {
+      orFilters.push(`filter[_or][${orFilters.length}][barcode][_eq]=${encodeURIComponent(body.barcode as string)}`);
+    }
+    if (body.rfidCode) {
+      orFilters.push(`filter[_or][${orFilters.length}][rfid_code][_eq]=${encodeURIComponent(body.rfidCode as string)}`);
+    }
+    
+    if (orFilters.length > 0) {
+      const queryStr = orFilters.join("&") + "&fields=serial,barcode,rfid_code";
+      const duplicateCheck = await directusFetch<{ data: Record<string, unknown>[] }>(
+        `/items/assets_and_equipment?${queryStr}`
+      );
+      
+      if (duplicateCheck.data && duplicateCheck.data.length > 0) {
+        return NextResponse.json({ 
+          error: "Duplicate fields detected", 
+          duplicates: duplicateCheck.data.map(d => ({ serial: d.serial, barcode: d.barcode, rfidCode: d.rfid_code })) 
+        }, { status: 409 });
+      }
+    }
+
     let classificationId = null;
     if (body.itemClassification) {
       const classRes = await directusFetch<{ data: Record<string, unknown>[] }>(`/items/item_classification?filter[classification_name][_eq]=${encodeURIComponent(body.itemClassification as string)}`);
@@ -277,14 +307,23 @@ export async function POST(request: NextRequest) {
 
     let finalItemId = body.itemId;
     if (!finalItemId && body.itemName) {
-      const itemRes = await directusFetch<{ data: Record<string, unknown>[] }>(`/items/items?filter[item_name][_eq]=${encodeURIComponent(body.itemName as string)}`);
+      const targetName = String(body.itemName);
+      let filterQuery = `/items/items?filter[item_name][_eq]=${encodeURIComponent(targetName)}`;
+      if (classificationId) filterQuery += `&filter[item_classification][_eq]=${classificationId}`;
+      else filterQuery += `&filter[item_classification][_null]=true`;
+      
+      if (typeId) filterQuery += `&filter[item_type][_eq]=${typeId}`;
+      else filterQuery += `&filter[item_type][_null]=true`;
+
+      const itemRes = await directusFetch<{ data: Record<string, unknown>[] }>(filterQuery);
+      
       if (itemRes.data && itemRes.data.length > 0) {
         finalItemId = itemRes.data[0].id;
       } else {
         const newItem = await directusFetch<{ data: Record<string, unknown> }>("/items/items", {
           method: "POST",
           body: JSON.stringify({ 
-            item_name: body.itemName,
+            item_name: targetName,
             item_classification: classificationId,
             item_type: typeId
           })

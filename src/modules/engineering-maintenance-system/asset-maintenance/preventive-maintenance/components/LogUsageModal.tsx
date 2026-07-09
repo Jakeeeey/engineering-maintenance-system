@@ -1,6 +1,7 @@
 "use client";
 
-import { useForm } from "react-hook-form";
+import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -39,7 +40,8 @@ interface LogUsageModalProps {
 
 export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps) {
   const { mutateAsync: logUsage, isPending } = useLogUsage(onSuccess);
-  
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -47,6 +49,12 @@ export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps
       meterValue: "",
       unit: "Hours",
     },
+  });
+
+  const unit = useWatch({
+    control: form.control,
+    name: "unit",
+    defaultValue: "Hours",
   });
 
   const onSubmit = async (values: FormValues) => {
@@ -65,7 +73,11 @@ export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent
+        className="max-w-md"
+        ref={setPortalNode}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Log Usage Meter</DialogTitle>
           <DialogDescription className="sr-only">
@@ -79,9 +91,16 @@ export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps
               name="assetId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Asset ID</FormLabel>
+                  <FormLabel>RFID Code</FormLabel>
                   <FormControl>
-                    <AssetCombobox value={field.value} onChange={field.onChange} />
+                    <AssetCombobox
+                      value={field.value}
+                      onChange={field.onChange}
+                      portalContainer={portalNode}
+                      requireSchedule={true}
+                      emptyMessage="Equipment doesn't have any Maintenance Schedule Set or is Currently Inactive."
+                      onSelectUnit={(unit) => form.setValue("unit", unit || "")}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -94,20 +113,12 @@ export function LogUsageModal({ isOpen, onClose, onSuccess }: LogUsageModalProps
                 <FormItem>
                   <FormLabel>Current Meter Value</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g. 5200" step="0.01" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="unit"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Unit of Measurement</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Hours, Kilometers" {...field} />
+                    <div className="flex items-center space-x-2">
+                      <Input type="number" placeholder="e.g. 5200" step="0.01" {...field} className="flex-1" />
+                      <span className="text-muted-foreground whitespace-nowrap font-medium min-w-[80px]">
+                        / {unit || "Unit"}
+                      </span>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

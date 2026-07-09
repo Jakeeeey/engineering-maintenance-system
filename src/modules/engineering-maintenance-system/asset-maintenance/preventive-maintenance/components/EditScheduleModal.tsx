@@ -51,7 +51,7 @@ interface EditScheduleModalProps {
 
 export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: EditScheduleModalProps) {
   const { mutateAsync: updateSchedule, isPending } = useUpdateSchedule(onSuccess);
-  
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -119,7 +119,10 @@ export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: Edit
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Edit Maintenance Schedule #{schedule.id}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -128,7 +131,7 @@ export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: Edit
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            
+
             <FormField
               control={form.control}
               name="isActive"
@@ -171,9 +174,9 @@ export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: Edit
                   name="timeIntervalUnit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unit</FormLabel>
+                      <FormLabel>Unit of Measurement</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Months" {...field} />
+                        <Input placeholder="e.g. Months" autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -216,9 +219,9 @@ export function EditScheduleModal({ isOpen, schedule, onClose, onSuccess }: Edit
                   name="usageIntervalUnit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unit</FormLabel>
+                      <FormLabel>Unit of Measurement</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Kilometers" {...field} />
+                        <Input placeholder="e.g. Kilometers" autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

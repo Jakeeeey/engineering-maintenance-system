@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,6 +28,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Combobox,
+  ComboboxInput,
+  ComboboxContent,
+  ComboboxList,
+  ComboboxItem,
+} from "@/components/ui/combobox";
 import { Separator } from "@/components/ui/separator";
 import { UploadCloud, X } from "lucide-react";
 import Image from "next/image";
@@ -40,14 +46,13 @@ const formSchema = z.object({
   itemClassification: z.string().min(1, "Classification is required"),
   itemType: z.string().min(1, "Type is required"),
   serial: z.string().min(1, "Serial number is required"),
-  barcode: z.string().optional(),
-  rfidCode: z.string().optional(),
-  costPerItem: z.string().min(1, "Cost is required"),
+  barcode: z.string().min(1, "Barcode is required"),
+  rfidCode: z.string().min(1, "RFID Code is required"),
   lifeSpan: z.string().min(1, "Expected life span is required"),
   dateAcquired: z.string().min(1, "Acquisition date is required"),
   employee: z.string().min(1, "Initial owner name is required"),
   condition: z.string().min(1, "Condition is required"),
-  location: z.string().optional(),
+  location: z.string().min(1, "Location is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -60,7 +65,29 @@ interface AddEquipmentModalProps {
 
 export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentModalProps) {
   const { mutateAsync: createEquipment, isPending } = useCreateEquipment();
+
   const { data: items = [] } = useGetReferences("items");
+  const { data: itemClassifications = [] } = useGetReferences("item_classification");
+  const { data: itemTypes = [] } = useGetReferences("item_type");
+
+  const [itemNameInput, setItemNameInput] = useState("");
+  const [itemClassificationInput, setItemClassificationInput] = useState("");
+  const [itemTypeInput, setItemTypeInput] = useState("");
+
+  const [itemNameOpen, setItemNameOpen] = useState(false);
+  const [itemClassificationOpen, setItemClassificationOpen] = useState(false);
+  const [itemTypeOpen, setItemTypeOpen] = useState(false);
+
+  const filteredItems = (items || []).filter((i: Record<string, unknown>) =>
+    String(i.item_name).toLowerCase().includes(itemNameInput.toLowerCase())
+  );
+  const filteredClassifications = (itemClassifications || []).filter((c: Record<string, unknown>) =>
+    String(c.classification_name).toLowerCase().includes(itemClassificationInput.toLowerCase())
+  );
+  const filteredTypes = (itemTypes || []).filter((t: Record<string, unknown>) =>
+    String(t.type_name).toLowerCase().includes(itemTypeInput.toLowerCase())
+  );
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [documentFiles, setDocumentFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -74,7 +101,6 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
       serial: "",
       barcode: "",
       rfidCode: "",
-      costPerItem: "",
       lifeSpan: "",
       dateAcquired: "",
       employee: "",
@@ -82,6 +108,8 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
       location: "",
     },
   });
+
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -93,15 +121,13 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
     }
   };
 
-  // When a user selects from a datalist or types, we don't strictly need derivedClassification if we have typable fields.
-
   const uploadFile = async (file: File, type: "image" | "document") => {
     const formData = new FormData();
     formData.append("file", file); // Directus expects "file"
-    const endpoint = type === "image" 
-      ? "/api/ems/asset-maintenance/equipment-registry/asset-image-upload" 
+    const endpoint = type === "image"
+      ? "/api/ems/asset-maintenance/equipment-registry/asset-image-upload"
       : "/api/ems/asset-maintenance/equipment-registry/asset-document-upload";
-    
+
     const res = await fetch(endpoint, {
       method: "POST",
       body: formData
@@ -112,13 +138,26 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
   };
 
   const onSubmit = async (values: FormValues) => {
+    if (itemNameInput !== values.itemName) {
+      form.setError("itemName", { type: "manual", message: "Unregistered input. Please select from the list or register." });
+      return;
+    }
+    if (itemClassificationInput !== values.itemClassification) {
+      form.setError("itemClassification", { type: "manual", message: "Unregistered input. Please select from the list or register." });
+      return;
+    }
+    if (itemTypeInput !== values.itemType) {
+      form.setError("itemType", { type: "manual", message: "Unregistered input. Please select from the list or register." });
+      return;
+    }
+
     try {
       setIsUploading(true);
       let imageId = undefined;
       if (imageFile) {
         imageId = await uploadFile(imageFile, "image");
       }
-      
+
       const docIds = [];
       for (const doc of documentFiles) {
         const docId = await uploadFile(doc, "document");
@@ -127,12 +166,12 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
 
       const payload: Record<string, unknown> = {
         ...values,
-        costPerItem: Number(values.costPerItem),
         lifeSpan: Number(values.lifeSpan),
         itemImage: imageId,
         documents: docIds.length > 0 ? docIds : undefined,
         isActive: true,
       };
+
       await createEquipment(payload);
       form.reset();
       setImageFile(null);
@@ -140,7 +179,21 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
       if (onSuccess) onSuccess();
       onClose();
     } catch (error) {
-      console.error("Failed to create equipment", error);
+      const err = error as { isDuplicateError?: boolean; duplicates?: { serial?: string; barcode?: string; rfidCode?: string }[] } | null;
+      if (err?.isDuplicateError) {
+        const duplicates = err.duplicates || [];
+        let hasSerial = false, hasBarcode = false, hasRfid = false;
+        for (const d of duplicates) {
+          if (d.serial === values.serial) hasSerial = true;
+          if (d.barcode === values.barcode) hasBarcode = true;
+          if (d.rfidCode === values.rfidCode) hasRfid = true;
+        }
+        if (hasSerial) form.setError("serial", { type: "manual", message: "Serial number already exists." });
+        if (hasBarcode) form.setError("barcode", { type: "manual", message: "Barcode already exists." });
+        if (hasRfid) form.setError("rfidCode", { type: "manual", message: "RFID code already exists." });
+      } else {
+        console.error("Failed to create equipment", error);
+      }
     } finally {
       setIsUploading(false);
     }
@@ -148,7 +201,7 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent ref={setPortalNode} className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Equipment</DialogTitle>
           <DialogDescription className="sr-only">
@@ -228,28 +281,69 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Item Name</FormLabel>
-                    <FormControl>
-                      <Input
-                        list="items-list"
-                        placeholder="Type or select an item"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          const matched = items.find((i: Record<string, unknown>) => String(i.item_name).toLowerCase() === e.target.value.toLowerCase());
+                    <Combobox
+                      open={itemNameOpen}
+                      onOpenChange={setItemNameOpen}
+                      value={field.value}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        setItemNameInput(val || "");
+                        if (val) {
+                          const matched = items.find((i: Record<string, unknown>) => i.item_name === val);
                           if (matched) {
                             const c = (matched.item_classification as Record<string, unknown>)?.classification_name || "";
                             const t = (matched.item_type as Record<string, unknown>)?.type_name || "";
                             form.setValue("itemClassification", String(c));
+                            setItemClassificationInput(String(c));
                             form.setValue("itemType", String(t));
+                            setItemTypeInput(String(t));
                           }
-                        }}
-                      />
-                    </FormControl>
-                    <datalist id="items-list">
-                      {items.map((i: Record<string, unknown>) => (
-                        <option key={String(i.id)} value={String(i.item_name)} />
-                      ))}
-                    </datalist>
+                        }
+                      }}
+                    >
+                      <FormControl>
+                        <ComboboxInput
+                          placeholder="Type or select an item"
+                          onChange={(e) => setItemNameInput(e.target.value)}
+                        />
+                      </FormControl>
+                      <ComboboxContent className="flex flex-col overflow-hidden" portalContainer={portalNode}>
+                        <ComboboxList className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                          {filteredItems.length > 0 ? (
+                            filteredItems.map((i: Record<string, unknown>) => (
+                              <ComboboxItem key={String(i.id)} value={String(i.item_name)}>
+                                {String(i.item_name)}
+                              </ComboboxItem>
+                            ))
+                          ) : (
+                            <div className="p-3 text-sm text-muted-foreground text-center">No matches found.</div>
+                          )}
+                        </ComboboxList>
+                        <div className="bg-background p-2 border-t mt-auto">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onClick={() => {
+                              if (!itemNameInput) return;
+                              const exists = items.find((i: Record<string, unknown>) =>
+                                String(i.item_name).toLowerCase() === itemNameInput.toLowerCase()
+                              );
+                              if (exists) {
+                                form.setError("itemName", { type: "manual", message: "Already exists. Please select it from the list." });
+                                return;
+                              }
+                              field.onChange(itemNameInput);
+                              setItemNameOpen(false);
+                            }}
+                          >
+                            Use new name
+                          </Button>
+                        </div>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -261,24 +355,73 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                   <FormItem>
                     <FormLabel>Initial Owner Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. John Doe" {...field} />
+                      <Input placeholder="e.g. John Doe" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-muted p-3 rounded-md">
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="itemClassification"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Classification</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Electronics" {...field} />
-                    </FormControl>
+                    <Combobox
+                      open={itemClassificationOpen}
+                      onOpenChange={setItemClassificationOpen}
+                      value={field.value}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        setItemClassificationInput(val || "");
+                      }}
+                    >
+                      <FormControl>
+                        <ComboboxInput
+                          placeholder="e.g. Electronics"
+                          onChange={(e) => setItemClassificationInput(e.target.value)}
+                        />
+                      </FormControl>
+                      <ComboboxContent className="flex flex-col overflow-hidden" portalContainer={portalNode}>
+                        <ComboboxList className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                          {filteredClassifications.length > 0 ? (
+                            filteredClassifications.map((c: Record<string, unknown>) => (
+                              <ComboboxItem key={String(c.id)} value={String(c.classification_name)}>
+                                {String(c.classification_name)}
+                              </ComboboxItem>
+                            ))
+                          ) : (
+                            <div className="p-3 text-sm text-muted-foreground text-center">No matches found.</div>
+                          )}
+                        </ComboboxList>
+                        <div className="bg-background p-2 border-t mt-auto">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onClick={() => {
+                              if (!itemClassificationInput) return;
+                              const exists = itemClassifications.find((c: Record<string, unknown>) =>
+                                String(c.classification_name).toLowerCase() === itemClassificationInput.toLowerCase()
+                              );
+                              if (exists) {
+                                form.setError("itemClassification", { type: "manual", message: "Already exists. Please select it from the list." });
+                                return;
+                              }
+                              field.onChange(itemClassificationInput);
+                              setItemClassificationOpen(false);
+                            }}
+                          >
+                            Use new classification
+                          </Button>
+                        </div>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -289,16 +432,78 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Laptop" {...field} />
-                    </FormControl>
+                    <Combobox
+                      open={itemTypeOpen}
+                      onOpenChange={setItemTypeOpen}
+                      value={field.value}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        setItemTypeInput(val || "");
+                      }}
+                    >
+                      <FormControl>
+                        <ComboboxInput
+                          placeholder="e.g. Laptop"
+                          onChange={(e) => setItemTypeInput(e.target.value)}
+                        />
+                      </FormControl>
+                      <ComboboxContent className="flex flex-col overflow-hidden" portalContainer={portalNode}>
+                        <ComboboxList className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+                          {filteredTypes.length > 0 ? (
+                            filteredTypes.map((t: Record<string, unknown>) => (
+                              <ComboboxItem key={String(t.id)} value={String(t.type_name)}>
+                                {String(t.type_name)}
+                              </ComboboxItem>
+                            ))
+                          ) : (
+                            <div className="p-3 text-sm text-muted-foreground text-center">No matches found.</div>
+                          )}
+                        </ComboboxList>
+                        <div className="bg-background p-2 border-t mt-auto">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full justify-start"
+                            onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                            onClick={() => {
+                              if (!itemTypeInput) return;
+                              const exists = itemTypes.find((t: Record<string, unknown>) =>
+                                String(t.type_name).toLowerCase() === itemTypeInput.toLowerCase()
+                              );
+                              if (exists) {
+                                form.setError("itemType", { type: "manual", message: "Already exists. Please select it from the list." });
+                                return;
+                              }
+                              field.onChange(itemTypeInput);
+                              setItemTypeOpen(false);
+                            }}
+                          >
+                            Use new type
+                          </Button>
+                        </div>
+                      </ComboboxContent>
+                    </Combobox>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="rfidCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>RFID Code</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter RFID code" autoComplete="off" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="serial"
@@ -306,49 +511,23 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                   <FormItem>
                     <FormLabel>Serial Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter serial number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="barcode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Barcode (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter barcode" {...field} />
+                      <Input placeholder="Enter serial number" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="rfidCode"
+                name="barcode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>RFID Code (Optional)</FormLabel>
+                    <FormLabel>Barcode</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter RFID code" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="costPerItem"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cost per Item</FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ""} />
+                      <Input placeholder="Enter barcode" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -369,7 +548,20 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter location" autoComplete="off" {...field} value={field.value ?? ""} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="dateAcquired"
@@ -383,6 +575,9 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                   </FormItem>
                 )}
               />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="condition"
@@ -395,7 +590,7 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                           <SelectValue placeholder="Select a condition" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent position="popper">
                         <SelectItem value="Good">Good</SelectItem>
                         <SelectItem value="Bad">Bad</SelectItem>
                         <SelectItem value="Under Maintenance">Under Maintenance</SelectItem>
@@ -406,32 +601,19 @@ export function AddEquipmentModal({ isOpen, onClose, onSuccess }: AddEquipmentMo
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter location" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2 col-span-1 md:col-span-2">
-                <FormLabel>Documents / Manuals</FormLabel>
-                <Input 
-                  type="file" 
-                  multiple 
+                <FormLabel>Documents/Manuals/Warranty</FormLabel>
+                <Input
+                  type="file"
+                  multiple
                   onChange={(e) => {
                     if (e.target.files) {
                       setDocumentFiles(Array.from(e.target.files));
                     }
-                  }} 
+                  }}
                 />
                 {documentFiles.length > 0 && (
                   <ul className="mt-2 text-sm text-muted-foreground list-disc list-inside">

@@ -14,6 +14,7 @@ export interface MaintenanceSchedule {
   createdBy: number | null;
   createdAt: string;
   updatedAt: string;
+  rfidCode?: string | null;
 }
 
 export interface MaintenanceWorkOrder {
@@ -29,6 +30,7 @@ export interface MaintenanceWorkOrder {
   generatedAt: string;
   completedAt: string | null;
   updatedAt: string;
+  rfidCode?: string | null;
 }
 
 export interface UsageMeterLog {

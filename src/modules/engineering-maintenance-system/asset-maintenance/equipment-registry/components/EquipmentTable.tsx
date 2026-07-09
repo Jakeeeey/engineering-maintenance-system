@@ -95,10 +95,10 @@ export function EquipmentTable({
         <TableHeader>
           <TableRow>
             <TableHead>Image</TableHead>
-            <TableHead>Asset ID</TableHead>
-            <TableHead>Name / Classification</TableHead>
+            <TableHead>RFID</TableHead>
+            <TableHead>Item Name / Classification</TableHead>
             <TableHead>Serial Number</TableHead>
-            <TableHead>Barcode / RFID</TableHead>
+            <TableHead>Barcode</TableHead>
             <TableHead>Condition</TableHead>
             <TableHead>Current Owner</TableHead>
             <TableHead>Date Acquired</TableHead>
@@ -120,16 +120,15 @@ export function EquipmentTable({
                     <div className="w-10 h-10 bg-gray-200 rounded-md flex items-center justify-center text-xs text-gray-500">N/A</div>
                   )}
                 </TableCell>
-                <TableCell className="font-medium">{asset.id}</TableCell>
+                <TableCell>{asset.rfidCode || "N/A"}</TableCell>
                 <TableCell>
                   <div>{asset.itemName}</div>
                   {asset.itemClassification && <div className="text-xs text-gray-500">{asset.itemClassification}</div>}
                 </TableCell>
                 <TableCell>{asset.serial}</TableCell>
                 <TableCell>
-                  {asset.barcode && <div className="text-xs">BC: {asset.barcode}</div>}
-                  {asset.rfidCode && <div className="text-xs">RFID: {asset.rfidCode}</div>}
-                  {!asset.barcode && !asset.rfidCode && <span className="text-gray-400">None</span>}
+                  {asset.barcode && <div className="text-xs">{asset.barcode}</div>}
+                  {!asset.barcode && <span className="text-gray-400">None</span>}
                 </TableCell>
                 <TableCell>
                   <Badge variant="outline" className={getConditionBadgeColor(asset.condition)}>

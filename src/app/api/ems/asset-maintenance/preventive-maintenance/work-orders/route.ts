@@ -90,6 +90,7 @@ export async function GET(request: Request) {
       const itemName = assetData?.item_id?.item_name || "Unknown Item";
       const classification = assetData?.item_id?.item_classification?.classification_name || "Unknown Classification";
       const location = assetData?.asset_location?.[0]?.location || "Unassigned";
+      const rfidCode = assetData?.rfid_code || null;
 
       return {
         id: item.id,
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
         generatedAt: item.generated_at,
         completedAt: item.completed_at,
         updatedAt: item.updated_at,
+        rfidCode,
       };
     });
 
@@ -117,6 +119,7 @@ export async function PATCH(request: Request) {
   try {
     const body = await request.json();
     const { id } = body;
+    const statusId = body.statusId !== undefined ? Number(body.statusId) : 3;
     
     if (!id) {
       return NextResponse.json({ error: "Missing work order ID" }, { status: 400 });
@@ -136,8 +139,8 @@ export async function PATCH(request: Request) {
     const completedAtDate = new Date();
     const completedAtISO = completedAtDate.toISOString();
 
-    // 2. Fetch and update the parent schedule BEFORE updating the work order
-    if (scheduleId) {
+    // 2. Fetch and update the parent schedule BEFORE updating the work order (Only if completed)
+    if (statusId === 3 && scheduleId) {
       const scheduleResponse = await directusFetch<DirectusItem<Record<string, unknown>>>(`items/maintenance_schedules/${scheduleId}`);
       const schedule = scheduleResponse.data;
 
@@ -201,11 +204,14 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // 4. Update the Work Order to Completed (status_id = 3)
-    const woPayload = {
-      status_id: 3, // Completed
-      completed_at: completedAtISO
+    // 4. Update the Work Order with statusId
+    const woPayload: Record<string, unknown> = {
+      status_id: statusId,
     };
+
+    if (statusId === 3) {
+      woPayload.completed_at = completedAtISO;
+    }
 
     const response = await directusFetch<DirectusItem<Record<string, unknown>>>(`items/maintenance_work_orders/${id}`, {
       method: "PATCH",
@@ -231,7 +237,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ data: workOrder });
   } catch (error) {
-    console.error("Failed to complete work order:", error);
-    return jsonError(error, "Failed to complete work order");
+    console.error("Failed to update work order:", error);
+    return jsonError(error, "Failed to update work order");
   }
 }

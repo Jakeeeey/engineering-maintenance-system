@@ -12,11 +12,11 @@ import { MaintenanceWorkOrder } from "../types";
 interface WorkOrdersTableProps {
   workOrders: MaintenanceWorkOrder[];
   isLoading: boolean;
-  onComplete: (id: string) => void;
-  isCompleting: boolean;
+  onUpdateStatus: (id: string, statusId: number) => void;
+  isUpdating: boolean;
 }
 
-export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompleting }: WorkOrdersTableProps) {
+export function WorkOrdersTable({ workOrders, isLoading, onUpdateStatus, isUpdating }: WorkOrdersTableProps) {
   if (isLoading) {
     return <div className="p-4 text-center text-muted-foreground">Loading work orders...</div>;
   }
@@ -31,7 +31,7 @@ export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompletin
         <TableHeader>
           <TableRow>
             <TableHead>ID</TableHead>
-            <TableHead>Asset ID</TableHead>
+            <TableHead>RFID</TableHead>
             <TableHead>Item Name</TableHead>
             <TableHead>Classification</TableHead>
             <TableHead>Location</TableHead>
@@ -45,12 +45,10 @@ export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompletin
         </TableHeader>
         <TableBody>
           {workOrders.map((wo) => {
-            const isCompleted = wo.statusId === 3 || wo.completedAt !== null;
-            
             return (
               <TableRow key={wo.id}>
                 <TableCell>{wo.id}</TableCell>
-                <TableCell>{wo.assetId}</TableCell>
+                <TableCell>{wo.rfidCode || "N/A"}</TableCell>
                 <TableCell>{wo.itemName ?? "N/A"}</TableCell>
                 <TableCell>{wo.classification ?? "N/A"}</TableCell>
                 <TableCell>{wo.location ?? "Unassigned"}</TableCell>
@@ -59,20 +57,30 @@ export function WorkOrdersTable({ workOrders, isLoading, onComplete, isCompletin
                 <TableCell>{new Date(wo.generatedAt).toLocaleString()}</TableCell>
                 <TableCell>{wo.completedAt ? new Date(wo.completedAt).toLocaleString() : "N/A"}</TableCell>
                 <TableCell>
-                  {isCompleted ? (
+                  {wo.statusId === 3 ? (
                     <span className="text-green-600 font-medium">Completed</span>
+                  ) : wo.statusId === 4 ? (
+                    <span className="text-red-500 font-medium">Cancelled</span>
+                  ) : wo.statusId === 2 ? (
+                    <span className="text-blue-500 font-medium">In Progress</span>
                   ) : (
                     <span className="text-orange-500 font-medium">Pending</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  {!isCompleted && (
-                    <Button 
-                      size="sm" 
-                      onClick={() => onComplete(wo.id.toString())} 
-                      disabled={isCompleting}
-                    >
-                      Mark Complete
+                  {(wo.statusId === 1 || !wo.statusId) && (
+                    <div className="flex justify-end gap-2">
+                      <Button size="sm" variant="outline" onClick={() => onUpdateStatus(wo.id.toString(), 2)} disabled={isUpdating}>
+                        Start Maintenance
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => onUpdateStatus(wo.id.toString(), 4)} disabled={isUpdating}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                  {wo.statusId === 2 && (
+                    <Button size="sm" onClick={() => onUpdateStatus(wo.id.toString(), 3)} disabled={isUpdating}>
+                      Complete
                     </Button>
                   )}
                 </TableCell>

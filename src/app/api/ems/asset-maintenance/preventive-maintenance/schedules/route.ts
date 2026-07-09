@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { directusFetch, DirectusList, DirectusItem, jsonError } from "../_utils";
 import { cookies } from "next/headers";
+import { decodeJwtPayload } from "@/lib/auth-utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,7 @@ export async function GET(request: Request) {
       const itemName = assetData?.item_id?.item_name || "Unknown Item";
       const classification = assetData?.item_id?.item_classification?.classification_name || "Unknown Classification";
       const location = assetData?.asset_location?.[0]?.location || "Unassigned";
+      const rfidCode = assetData?.rfid_code || null;
       
       return {
         id: item.id,
@@ -68,6 +70,7 @@ export async function GET(request: Request) {
         createdBy: item.created_by,
         createdAt: item.created_at,
         updatedAt: item.updated_at,
+        rfidCode,
       };
     });
 
@@ -143,22 +146,22 @@ export async function PATCH(request: Request) {
     if (updates.nextDueUsage !== undefined) payload.next_due_usage = updates.nextDueUsage;
     if (updates.isActive !== undefined) payload.is_active = updates.isActive;
 
-    // Use the user's session token to enforce RBAC
+    // Enforce RBAC
     const authHeader = request.headers.get("Authorization");
-    const init: RequestInit = { headers: {} };
-    if (authHeader) {
-      init.headers = { Authorization: authHeader };
-    } else {
-      const cookieStore = await cookies();
-      const token = cookieStore.get("vos_access_token")?.value;
-      if (token) {
-        init.headers = { Authorization: `Bearer ${token}` };
-      }
+    const cookieStore = await cookies();
+    const token = authHeader?.replace("Bearer ", "") || cookieStore.get("vos_access_token")?.value;
+    
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    const jwtPayload = decodeJwtPayload(token);
+    if (!jwtPayload || jwtPayload.role === "Viewer" || jwtPayload.role === "Technician") {
+      return NextResponse.json({ error: "Forbidden: Insufficient privileges" }, { status: 403 });
     }
 
     const response = await directusFetch<DirectusItem<Record<string, unknown>>>(`items/maintenance_schedules/${id}`, {
       method: "PATCH",
-      ...init,
       body: JSON.stringify(payload),
     });
 

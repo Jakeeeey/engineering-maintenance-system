@@ -16,6 +16,7 @@ export function EquipmentFilters({ filters, onFilterChange }: EquipmentFiltersPr
         <Input
           id="search"
           placeholder="Search by name or serial..."
+          autoComplete="off"
           value={filters.search || ""}
           onChange={(e) => onFilterChange({ ...filters, search: e.target.value })}
         />
@@ -31,7 +32,7 @@ export function EquipmentFilters({ filters, onFilterChange }: EquipmentFiltersPr
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="All Conditions" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper">
             <SelectItem value="all">All Conditions</SelectItem>
             <SelectItem value="Good">Good</SelectItem>
             <SelectItem value="Bad">Bad</SelectItem>

@@ -38,7 +38,11 @@ export class EquipmentRegistryApi {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      throw new Error("Failed to create equipment");
+      const errorJson = await res.json().catch(() => null);
+      if (res.status === 409 && errorJson?.error === "Duplicate fields detected") {
+        throw { isDuplicateError: true, duplicates: errorJson.duplicates };
+      }
+      throw new Error("Failed to process equipment");
     }
     const json = await res.json();
     return json.data;
@@ -53,7 +57,11 @@ export class EquipmentRegistryApi {
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      throw new Error(`Failed to update equipment for ${id}`);
+      const errorJson = await res.json().catch(() => null);
+      if (res.status === 409 && errorJson?.error === "Duplicate fields detected") {
+        throw { isDuplicateError: true, duplicates: errorJson.duplicates };
+      }
+      throw new Error("Failed to process equipment");
     }
     const json = await res.json();
     return json.data;
@@ -92,5 +100,20 @@ export class EquipmentRegistryApi {
     }
     const json = await res.json();
     return json.data || [];
+  }
+
+  static async createReference(type: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const res = await fetch(`/api/ems/asset-maintenance/references`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ type, payload }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to create reference of type ${type}`);
+    }
+    const json = await res.json();
+    return json.data;
   }
 }

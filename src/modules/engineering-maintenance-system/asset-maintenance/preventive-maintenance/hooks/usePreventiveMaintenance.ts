@@ -105,13 +105,13 @@ export function useGetWorkOrders() {
   return { data, isLoading, isError, refetch };
 }
 
-export function useCompleteWorkOrder(onSuccess?: () => void) {
+export function useUpdateWorkOrderStatus(onSuccess?: () => void) {
   const [isPending, setIsPending] = useState(false);
 
-  const mutateAsync = async (args: { id: string }) => {
+  const mutateAsync = async (args: { id: string; statusId: number }) => {
     setIsPending(true);
     try {
-      const res = await PreventiveMaintenanceApi.completeWorkOrder(args.id);
+      const res = await PreventiveMaintenanceApi.updateWorkOrderStatus(args.id, args.statusId);
       onSuccess?.();
       return res;
     } finally {

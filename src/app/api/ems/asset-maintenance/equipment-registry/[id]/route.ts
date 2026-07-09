@@ -11,7 +11,7 @@ function mapToCamelCase(item: Record<string, unknown>): Asset {
 
   const owners = item.asset_owners as Array<Record<string, unknown>> | undefined;
   const currentOwner = owners?.find(o => o.is_current_owner === 1 || o.is_current_owner === true);
-  const employeeName = currentOwner ? currentOwner.owner_name : (item.employee as string || "Unassigned");
+  const employeeName = currentOwner ? (currentOwner.owner_name as string) : "Unassigned";
 
   return {
     id: item.id as string,
@@ -116,10 +116,36 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
+
+    const orFilters: string[] = [];
+    if (body.serial) {
+      orFilters.push(`filter[_and][1][_or][${orFilters.length}][serial][_eq]=${encodeURIComponent(body.serial as string)}`);
+    }
+    if (body.barcode) {
+      orFilters.push(`filter[_and][1][_or][${orFilters.length}][barcode][_eq]=${encodeURIComponent(body.barcode as string)}`);
+    }
+    if (body.rfidCode) {
+      orFilters.push(`filter[_and][1][_or][${orFilters.length}][rfid_code][_eq]=${encodeURIComponent(body.rfidCode as string)}`);
+    }
+    
+    if (orFilters.length > 0) {
+      const queryStr = `filter[_and][0][id][_neq]=${encodeURIComponent(id)}&` + orFilters.join("&") + "&fields=serial,barcode,rfid_code";
+      const duplicateCheck = await directusFetch<{ data: Record<string, unknown>[] }>(
+        `/items/assets_and_equipment?${queryStr}`
+      );
+      
+      if (duplicateCheck.data && duplicateCheck.data.length > 0) {
+        return NextResponse.json({ 
+          error: "Duplicate fields detected", 
+          duplicates: duplicateCheck.data.map(d => ({ serial: d.serial, barcode: d.barcode, rfidCode: d.rfid_code })) 
+        }, { status: 409 });
+      }
+    }
+
     const payload = mapToSnakeCase(body);
 
     // 1. Fetch current asset to check for condition and item changes
-    const currentAssetRes = await directusFetch<{ data: Record<string, unknown> }>(`/items/assets_and_equipment/${id}?fields=*,item_id.id,item_id.item_name,item_id.item_classification.classification_name,item_id.item_type.type_name`);
+    const currentAssetRes = await directusFetch<{ data: Record<string, unknown> }>(`/items/assets_and_equipment/${id}?fields=*,item_id.id,item_id.item_name,item_id.item_classification.id,item_id.item_classification.classification_name,item_id.item_type.id,item_id.item_type.type_name`);
     const currentAsset = currentAssetRes.data;
 
     const token = request.cookies.get("vos_access_token")?.value;
@@ -156,16 +182,16 @@ export async function PATCH(
     }
 
     // 3. Handle Item changes (itemName, itemClassification, itemType)
-    // We update the associated `items` directly
+    // We update the associated `items` directly (Mutating the base item)
     const itemIdObj = currentAsset.item_id as Record<string, unknown> | undefined;
     if (itemIdObj && itemIdObj.id) {
       const itemsUpdatePayload: Record<string, unknown> = {};
+      
       if (body.itemName !== undefined && body.itemName !== itemIdObj.item_name) {
         itemsUpdatePayload.item_name = body.itemName;
       }
       
       if (body.itemClassification !== undefined) {
-        // Resolve classification ID
         const classRes = await directusFetch<{ data: Record<string, unknown>[] }>(`/items/item_classification?filter[classification_name][_eq]=${encodeURIComponent(body.itemClassification)}`);
         if (classRes.data && classRes.data.length > 0) {
           itemsUpdatePayload.item_classification = classRes.data[0].id;
@@ -179,7 +205,6 @@ export async function PATCH(
       }
 
       if (body.itemType !== undefined) {
-        // Resolve type ID
         const typeRes = await directusFetch<{ data: Record<string, unknown>[] }>(`/items/item_type?filter[type_name][_eq]=${encodeURIComponent(body.itemType)}`);
         if (typeRes.data && typeRes.data.length > 0) {
           itemsUpdatePayload.item_type = typeRes.data[0].id;
@@ -197,6 +222,11 @@ export async function PATCH(
           method: "PATCH",
           body: JSON.stringify(itemsUpdatePayload),
         });
+      }
+      
+      // Ensure we do NOT overwrite payload.item_id since we patched the base item directly
+      if (payload.item_id) {
+        delete payload.item_id;
       }
     }
 

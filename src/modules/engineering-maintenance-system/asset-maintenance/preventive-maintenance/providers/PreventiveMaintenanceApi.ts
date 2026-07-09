@@ -68,16 +68,16 @@ export class PreventiveMaintenanceApi {
     return json.data;
   }
 
-  static async completeWorkOrder(id: string): Promise<void> {
+  static async updateWorkOrderStatus(id: string, statusId: number): Promise<void> {
     const res = await fetch(`${BASE_URL}/work-orders`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ id: parseInt(id, 10) }),
+      body: JSON.stringify({ id: parseInt(id, 10), statusId }),
     });
     if (!res.ok) {
-      throw new Error(`Failed to complete work order ${id}`);
+      throw new Error(`Failed to update work order status ${id}`);
     }
   }
 }

@@ -141,3 +141,22 @@ export function useGetReferences(type: string) {
 
   return { data, isLoading, isError, refetch };
 }
+
+export function useCreateReference(options?: { onSuccess?: () => void }) {
+  const [isPending, setIsPending] = useState(false);
+
+  const mutateAsync = async (args: { type: string; payload: Record<string, unknown> }) => {
+    setIsPending(true);
+    try {
+      const result = await EquipmentRegistryApi.createReference(args.type, args.payload);
+      if (options?.onSuccess) {
+        options.onSuccess();
+      }
+      return result;
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return { mutateAsync, isPending };
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +44,8 @@ interface AddScheduleModalProps {
 
 export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModalProps) {
   const { mutateAsync: createSchedule, isPending } = useCreateSchedule(onSuccess);
-  
+  const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -91,7 +93,11 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        ref={setPortalNode}
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Add Maintenance Schedule</DialogTitle>
           <DialogDescription className="sr-only">
@@ -105,15 +111,15 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
               name="assetId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Asset ID</FormLabel>
+                  <FormLabel>RFID Code</FormLabel>
                   <FormControl>
-                    <AssetCombobox value={field.value} onChange={field.onChange} />
+                    <AssetCombobox value={field.value} onChange={field.onChange} portalContainer={portalNode} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            
+
             <div className="border rounded-md p-3 space-y-3">
               <h4 className="font-semibold text-sm">Time-Based Trigger</h4>
               <div className="grid grid-cols-2 gap-4">
@@ -135,9 +141,9 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
                   name="timeIntervalUnit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unit</FormLabel>
+                      <FormLabel>Unit of Measurement</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Months" {...field} />
+                        <Input placeholder="e.g. Months" autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -180,9 +186,9 @@ export function AddScheduleModal({ isOpen, onClose, onSuccess }: AddScheduleModa
                   name="usageIntervalUnit"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Unit</FormLabel>
+                      <FormLabel>Unit of Measurement</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Kilometers" {...field} />
+                        <Input placeholder="e.g. Kilometers" autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
